@@ -72,21 +72,6 @@ def extract_curriculum(text):
     
     return curriculum
 
-import os
-import re
-import json
-import pytesseract
-from pdf2image import convert_from_path
-from PyPDF2 import PdfReader
-from PIL import Image
-from pathlib import Path
-from docling.backend.docling_parse_backend import DoclingParseDocumentBackend
-from docling.datamodel.base_models import InputFormat
-from docling.datamodel.pipeline_options import (
-    PdfPipelineOptions,
-    TesseractCliOcrOptions,
-)
-from docling.document_converter import DocumentConverter, PdfFormatOption
 
 def extract_text_using_docling(pdf_path):
     """
