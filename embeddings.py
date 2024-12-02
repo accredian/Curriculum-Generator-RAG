@@ -5,6 +5,7 @@ import numpy as np
 from transformers import pipeline
 import os
 from huggingface_hub import login
+# os.environ['OPENAI_API_KEY'] = 'sk-lsjfd'
 
 
 
@@ -107,41 +108,118 @@ def query_faiss_index(index, metadata, query, model_name='all-MiniLM-L6-v2', k=5
 
 #-----------------------------------------------------------------------Pass result to llm-------------------------------------------------------------#
 
-def generate_llm_output(results, max_length=500):
+# def generate_llm_output(results, max_new_tokens=500):
+#     """
+#     Generate output from LLM using retrieved results.
+#     :param results: List of matching curriculum records.
+#     :param max_new_tokens: Maximum number of new tokens to generate.
+#     :return: Generated text from LLM.
+#     """
+#     # Use the correct model identifier for Llama 3
+#     model_id = "meta-llama/Llama-3.2-1B"
+    
+#     generator = pipeline(
+#         "text-generation",
+#         model=model_id,
+#         torch_dtype="auto",
+#         device_map="auto"
+#     )
+    
+#     input_text = "\n\n".join([f"Subject: {res['subject']}\nCurriculum: {res['curriculum']}" for res in results])
+#     prompt = f"Create a detailed curriculum for the following according to the curriculum I am giving to you:\n{input_text}"
+    
+#     output = generator(
+#         prompt,
+#         max_new_tokens=max_new_tokens,  # Change to max_new_tokens
+#         do_sample=True,
+#         temperature=0.7,
+#         top_p=0.95,
+#         num_return_sequences=1
+#     )
+    
+#     return output[0]['generated_text']
+
+# import openai
+
+# def generate_llm_output(results, max_tokens=None):
+#     """
+#     Generate output from OpenAI's GPT model using retrieved results.
+#     :param results: List of matching curriculum records.
+#     :param max_tokens: Maximum number of tokens to generate.
+#     :return: Generated text from OpenAI API.
+#     """
+#     # Initialize OpenAI client
+#     client = openai.OpenAI()
+    
+#     # Prepare input text
+#     input_text = "\n\n".join([f"Subject: {res['subject']}\nCurriculum: {res['curriculum']}" for res in results])
+    
+#     # Construct prompt
+#     prompt = f"Create a detailed curriculum for the following according to the curriculum I am giving to you , carefully examine the number of pillars if there and modules and terms and try to keep the number same as given:\n{input_text}"
+    
+#     try:
+#         # Call OpenAI API
+#         response = client.chat.completions.create(
+#             model="gpt-4o",  # You can change to gpt-4 if preferred
+#             messages=[
+#                 {"role": "system", "content": "You are a helpful curriculum design assistant."},
+#                 {"role": "user", "content": prompt}
+#             ],
+#             # max_tokens=max_tokens,
+#             n=1,
+#             stop=None,
+#             temperature=0.7
+#         )
+        
+#         # Extract and return the generated text
+#         return response.choices[0].message.content.strip()
+    
+#     except Exception as e:
+#         print(f"Error in OpenAI API call: {e}")
+#         return None
+
+from g4f.client import Client
+
+def generate_llm_output(results, max_length=None):
     """
-    Generate output from LLM using retrieved results.
+    Generate output from LLM using retrieved results and GPT-4o-mini API.
     :param results: List of matching curriculum records.
     :param max_length: Max length of generated text.
     :return: Generated text from LLM.
     """
-    # Use the correct model identifier for Llama 2
-    model_id = "meta-llama/Llama-2-7b-chat-hf"
+    # Initialize the GPT-4o-mini client
+    client = Client()
     
-    generator = pipeline(
-        "text-generation",
-        model=model_id,
-        torch_dtype="auto",
-        device_map="auto"
-    )
-    
+    # Prepare the input text based on the results
     input_text = "\n\n".join([f"Subject: {res['subject']}\nCurriculum: {res['curriculum']}" for res in results])
-    prompt = f"Create a detailed course outline for the following:\n{input_text}"
-    
-    output = generator(
-        prompt,
-        max_length=max_length,
-        do_sample=True,
-        temperature=0.7,
-        top_p=0.95,
-        num_return_sequences=1
+    prompt = f"""Design a detailed curriculum based on the course duration, using the provided example curriculum as a benchmark for structure and coherence. For every month, assign 1 term. Each term consists of 4 modules, and each module contains 4 topics. Ensure the total number of terms, modules, and topics is proportional to the course duration.  
+
+    For example:
+        - A 12-month program will have 12 terms, 48 modules, and 192 topics.
+        - An 8-month program will have 8 terms, 32 modules, and 128 topics.
+        - A 6-month program will have 6 terms, 24 modules, and 96 topics.  
+
+    Use the provided curriculum below as a reference for tone, style, and content distribution. Create a similarly structured curriculum, adjusting the specifics based on the course duration and ignore pillars do not use them and do not copy paste the given example curriculum:  
+
+    {input_text}  
+    """
+
+                    
+    # Make the API call to GPT-4o-mini
+    response = client.chat.completions.create(
+        model="gpt-4o",  # Using GPT-4o-mini model
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=max_length  # Limit the number of tokens generated
     )
     
-    return output[0]['generated_text']
+    # Extract the generated text from the API response
+    generated_text = response.choices[0].message.content
+    
+    return generated_text
+
 
 
 #-----------------------------------------------------------------------Full pipeline-------------------------------------------------------------#
-
-
 
 
 def run_rag_pipeline(json_file, user_query):
@@ -176,7 +254,7 @@ if __name__ == "__main__":
     json_file = "curriculum_data.json"
 
     # Example user query
-    user_query = "Strategic Management course for 12 months"
+    user_query = "Project Management course for 6 months"
 
     # Run the pipeline
     output = run_rag_pipeline(json_file, user_query)

@@ -1,35 +1,61 @@
-import shutil
+import subprocess
 import os
-from huggingface_hub import try_to_load_from_cache
-from transformers.utils import clean_cache
 
-def check_disk_space():
-    """Check disk space in the current directory and cache directory"""
-    # Check current directory space
-    total, used, free = shutil.disk_usage("/")
+def get_directory_size(path):
+    """Get directory size using du command"""
+    try:
+        result = subprocess.run(['du', '-sh', path], 
+                              capture_output=True, 
+                              text=True)
+        if result.returncode == 0:
+            size = result.stdout.split()[0]
+            return size
+        return "Error"
+    except Exception:
+        return "Error"
+
+def analyze_space():
+    """Analyze disk space usage safely"""
+    print("Analyzing disk space usage...\n")
     
-    # Convert to GB for readable format
-    total_gb = total // (2**30)
-    used_gb = used // (2**30)
-    free_gb = free // (2**30)
+    # Key directories to check
+    directories = {
+        "Python Environment": "/home/codespace/.python",
+        "VS Code Server": "/home/codespace/.vscode-server",
+        "Project Files": "/workspaces/Curriculum_Generator",
+        "NPM Packages": "/home/codespace/.npm",
+        "Node Modules": "/workspaces/node_modules",
+        "Git": "/workspaces/.git"
+    }
     
-    print("\nDisk Space Information:")
-    print(f"Total: {total_gb}GB")
-    print(f"Used: {used_gb}GB")
-    print(f"Free: {free_gb}GB")
+    print("Directory Sizes:")
+    print("-" * 50)
+    for name, path in directories.items():
+        if os.path.exists(path):
+            size = get_directory_size(path)
+            print(f"{name:<20}: {size}")
     
-    # Check Hugging Face cache directory
-    cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
-    if os.path.exists(cache_dir):
-        cache_usage = sum(os.path.getsize(os.path.join(dirpath,filename)) 
-                         for dirpath, _, filenames in os.walk(cache_dir)
-                         for filename in filenames)
-        cache_usage_gb = cache_usage // (2**30)
-        print(f"\nHugging Face Cache Usage: {cache_usage_gb}GB")
-        print(f"Cache Directory: {cache_dir}")
+    print("\nLargest Files:")
+    print("-" * 50)
+    try:
+        # Find top 10 largest files, excluding symbolic links
+        cmd = "find /workspaces /home/codespace -type f -not -type l -exec du -h {} + 2>/dev/null | sort -rh | head -n 10"
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        print(result.stdout)
+    except Exception as e:
+        print(f"Error finding largest files: {e}")
+    
+    # Get overall disk usage
+    total, used, free = os.statvfs('/')
+    total_gb = (total * free.f_frsize) / (1024**3)
+    used_gb = ((total - free) * free.f_frsize) / (1024**3)
+    free_gb = (free * free.f_frsize) / (1024**3)
+    
+    print("\nOverall Disk Usage:")
+    print("-" * 50)
+    print(f"Total: {total_gb:.2f}GB")
+    print(f"Used:  {used_gb:.2f}GB")
+    print(f"Free:  {free_gb:.2f}GB")
 
 if __name__ == "__main__":
-    check_disk_space()
-
-    # Clean the cache
-    clean_cache()
+    analyze_space()
