@@ -6,9 +6,8 @@ from transformers import pipeline
 import os
 from huggingface_hub import login
 # os.environ['OPENAI_API_KEY'] = 'sk-lsjfd'
-from crewai import Agent, Task, Crew, Process
-from langchain.tools import DuckDuckGoSearchRun
-from langchain.agents import load_tools
+# from crewai import Agent, Task, Crew
+
 
 
 def set_hf_token(token):
@@ -112,40 +111,6 @@ def query_faiss_index(index, metadata, query, model_name='all-MiniLM-L6-v2', k=5
     return results
 
 #----------------------------------------------------------------------crew ai-----------------------------------------------------------------------------#
-def create_curriculum_agents():
-    """Create specialized agents for curriculum development"""
-    
-    search_tool = DuckDuckGoSearchRun()
-    research_tools = load_tools(["ddg-search"])
-
-    # Research Agent
-    researcher = Agent(
-        role='Curriculum Researcher',
-        goal='Research latest trends, technologies and best practices in the field',
-        backstory='Expert in educational research and curriculum development with expertise in finding relevant industry trends',
-        tools=[search_tool],
-        verbose=True
-    )
-
-    # Content Developer
-    developer = Agent(
-        role='Content Developer',
-        goal='Create detailed curriculum structure with modules and topics',
-        backstory='Experienced curriculum designer with expertise in creating engaging learning paths',
-        tools=research_tools,
-        verbose=True
-    )
-
-    # Quality Reviewer  
-    reviewer = Agent(
-        role='Quality Reviewer',
-        goal='Review and enhance curriculum content for quality and completeness',
-        backstory='Senior education consultant specialized in curriculum quality assurance',
-        verbose=True
-    )
-
-    return researcher, developer, reviewer
-
 
 #-----------------------------------------------------------------------Pass result to llm-------------------------------------------------------------#
 
@@ -257,6 +222,6 @@ if __name__ == "__main__":
     output = run_rag_pipeline(json_file, user_query, course_name, duration)
     print(output)
 
-    # Save output to a text file
-    with open("output.txt", "w") as file:
-        file.write(output)
+    # # Save output to a text file
+    # with open("output.txt", "w") as file:
+    #     file.write(output)
