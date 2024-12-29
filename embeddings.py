@@ -1,14 +1,21 @@
+from transformers import pipeline
+import os
 from sentence_transformers import SentenceTransformer
 import json
 import faiss
 import numpy as np
 from transformers import pipeline
-import os
 from huggingface_hub import login
-# os.environ['OPENAI_API_KEY'] = 'sk-lsjfd'
-from crewai import Agent, Task, Crew, Process
-from langchain.tools import DuckDuckGoSearchRun
-from langchain.agents import load_tools
+import json
+os.environ['OPENAI_API_KEY'] = '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'
+os.environ['SERPER_API_KEY'] = '9f706fe3bb60606ca3a8d0cbf5b4986b31d4a84d'
+__import__('pysqlite3')
+import sys
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+from crewai import Agent, Crew, Process, Task
+from crewai.project import CrewBase, agent, crew, task
+from crewai_tools import SerperDevTool
+import openai
 
 
 def set_hf_token(token):
@@ -112,39 +119,7 @@ def query_faiss_index(index, metadata, query, model_name='all-MiniLM-L6-v2', k=5
     return results
 
 #----------------------------------------------------------------------crew ai-----------------------------------------------------------------------------#
-def create_curriculum_agents():
-    """Create specialized agents for curriculum development"""
-    
-    search_tool = DuckDuckGoSearchRun()
-    research_tools = load_tools(["ddg-search"])
 
-    # Research Agent
-    researcher = Agent(
-        role='Curriculum Researcher',
-        goal='Research latest trends, technologies and best practices in the field',
-        backstory='Expert in educational research and curriculum development with expertise in finding relevant industry trends',
-        tools=[search_tool],
-        verbose=True
-    )
-
-    # Content Developer
-    developer = Agent(
-        role='Content Developer',
-        goal='Create detailed curriculum structure with modules and topics',
-        backstory='Experienced curriculum designer with expertise in creating engaging learning paths',
-        tools=research_tools,
-        verbose=True
-    )
-
-    # Quality Reviewer  
-    reviewer = Agent(
-        role='Quality Reviewer',
-        goal='Review and enhance curriculum content for quality and completeness',
-        backstory='Senior education consultant specialized in curriculum quality assurance',
-        verbose=True
-    )
-
-    return researcher, developer, reviewer
 
 
 #-----------------------------------------------------------------------Pass result to llm-------------------------------------------------------------#
@@ -152,7 +127,7 @@ def create_curriculum_agents():
 
 
 # -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------#
-from g4f.client import Client
+# from g4f.client import Client
 
 def generate_llm_output(results, max_new_tokens=200, course_name=None, duration=None, max_length=None):
     """
