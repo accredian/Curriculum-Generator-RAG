@@ -5,16 +5,10 @@ import numpy as np
 from transformers import pipeline
 import os
 from huggingface_hub import login
-os.environ['OPENAI_API_KEY'] = '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'
-os.environ['SERPER_API_KEY'] = '9f706fe3bb60606ca3a8d0cbf5b4986b31d4a84d'
-__import__('pysqlite3')
-import sys
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
-from crewai import Agent, Crew, Process, Task
-from crewai.project import CrewBase, agent, crew, task
-from crewai_tools import SerperDevTool
-import openai
-
+# os.environ['OPENAI_API_KEY'] = 'sk-lsjfd'
+from crewai import Agent, Task, Crew, Process
+from langchain.tools import DuckDuckGoSearchRun
+from langchain.agents import load_tools
 
 
 def set_hf_token(token):
@@ -118,73 +112,47 @@ def query_faiss_index(index, metadata, query, model_name='all-MiniLM-L6-v2', k=5
     return results
 
 #----------------------------------------------------------------------crew ai-----------------------------------------------------------------------------#
-import openai
+def create_curriculum_agents():
+    """Create specialized agents for curriculum development"""
+    
+    search_tool = DuckDuckGoSearchRun()
+    research_tools = load_tools(["ddg-search"])
 
-# def generate_llm_output(results, max_new_tokens=200, course_name=None, duration=None, max_length=None):
-#     """
-#     Generate output from OpenAI's GPT model using retrieved results.
-#     :param results: List of matching curriculum records.
-#     :param max_tokens: Maximum number of tokens to generate.
-#     :return: Generated text from OpenAI API.
-#     """
-#     # Initialize OpenAI client
-#     client = openai.OpenAI()
-    
-#     # Prepare input text
-#     input_text = "\n\n".join([f"Subject: {res['subject']}\nCurriculum: {res['curriculum']}" for res in results])
-    
-#     # Construct prompt
-#     num_terms = duration
-#     num_modules = duration * 4
-#     num_topics = duration * 4 * 4
-    
-#     prompt = f"""
-#         You are tasked with designing a unique and detailed curriculum for the following course:
-        
-#         **Course Name:** {course_name}  
-#         **Duration:** {duration} months  
-        
-#         Logic for the curriculum structure:  
-#         - For every month, assign 1 term.  
-#         - Each term consists of 4 modules.  
-#         - Each module contains 4 topics.  
-        
-#         Based on this structure:  
-#         - This course should have {num_terms} terms.  
-#         - It should include {num_modules} modules.  
-#         - A total of {num_topics} topics should be covered.  
-        
-#         Use the provided curriculum below as inspiration for structure, formatting, and level of detail.  
-#         **Do not copy any part of the example text directly.**  
-#         Instead, generate a fresh and creative curriculum tailored to the course's requirements and duration.  
-#         Reference curriculum for inspiration:  
-#         {input_text}  
-        
-#         Ensure your output is distinct, clear, and aligned with the course's focus areas while adhering to the calculated structure.
-#     """    
-#     try:
-#         # Call OpenAI API
-#         response = client.chat.completions.create(
-#             model="gpt-4o",  # You can change to gpt-4 if preferred
-#             messages=[
-#                 {"role": "system", "content": "You are a helpful curriculum design assistant."},
-#                 {"role": "user", "content": prompt}
-#             ],
-#             # max_tokens=max_tokens,
-#             n=1,
-#             stop=None,
-#             temperature=0.7
-#         )
-        
-#         # Extract and return the generated text
-#         return response.choices[0].message.content.strip()
-    
-#     except Exception as e:
-#         print(f"Error in OpenAI API call: {e}")
-#         return None
+    # Research Agent
+    researcher = Agent(
+        role='Curriculum Researcher',
+        goal='Research latest trends, technologies and best practices in the field',
+        backstory='Expert in educational research and curriculum development with expertise in finding relevant industry trends',
+        tools=[search_tool],
+        verbose=True
+    )
+
+    # Content Developer
+    developer = Agent(
+        role='Content Developer',
+        goal='Create detailed curriculum structure with modules and topics',
+        backstory='Experienced curriculum designer with expertise in creating engaging learning paths',
+        tools=research_tools,
+        verbose=True
+    )
+
+    # Quality Reviewer  
+    reviewer = Agent(
+        role='Quality Reviewer',
+        goal='Review and enhance curriculum content for quality and completeness',
+        backstory='Senior education consultant specialized in curriculum quality assurance',
+        verbose=True
+    )
+
+    return researcher, developer, reviewer
+
+
+#-----------------------------------------------------------------------Pass result to llm-------------------------------------------------------------#
 
 
 
+# -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------#
+from g4f.client import Client
 
 def generate_llm_output(results, max_new_tokens=200, course_name=None, duration=None, max_length=None):
     """
@@ -446,6 +414,6 @@ if __name__ == "__main__":
     output = run_rag_pipeline(json_file, user_query, course_name, duration)
     print(output)
 
-    # Save output to a text file
-    with open("output.txt", "w") as file:
-        file.write(output)
+    # # Save output to a text file
+    # with open("output.txt", "w") as file:
+    #     file.write(output)
