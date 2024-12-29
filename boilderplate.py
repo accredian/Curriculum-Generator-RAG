@@ -72,43 +72,4 @@
     
 #     return output[0]['generated_text'].strip()
 
-
-# import openai
-
-# def generate_llm_output(results, max_tokens=None):
-#     """
-#     Generate output from OpenAI's GPT model using retrieved results.
-#     :param results: List of matching curriculum records.
-#     :param max_tokens: Maximum number of tokens to generate.
-#     :return: Generated text from OpenAI API.
-#     """
-#     # Initialize OpenAI client
-#     client = openai.OpenAI()
-    
-#     # Prepare input text
-#     input_text = "\n\n".join([f"Subject: {res['subject']}\nCurriculum: {res['curriculum']}" for res in results])
-    
-#     # Construct prompt
-#     prompt = f"Create a detailed curriculum for the following according to the curriculum I am giving to you , carefully examine the number of pillars if there and modules and terms and try to keep the number same as given:\n{input_text}"
-    
-#     try:
-#         # Call OpenAI API
-#         response = client.chat.completions.create(
-#             model="gpt-4o",  # You can change to gpt-4 if preferred
-#             messages=[
-#                 {"role": "system", "content": "You are a helpful curriculum design assistant."},
-#                 {"role": "user", "content": prompt}
-#             ],
-#             # max_tokens=max_tokens,
-#             n=1,
-#             stop=None,
-#             temperature=0.7
-#         )
-        
-#         # Extract and return the generated text
-#         return response.choices[0].message.content.strip()
-    
-#     except Exception as e:
-#         print(f"Error in OpenAI API call: {e}")
-#         return None
-
+# ---------------------- crewai code ----------------------------
