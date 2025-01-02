@@ -7,7 +7,7 @@ import numpy as np
 from transformers import pipeline
 from huggingface_hub import login
 import json
-os.environ['OPENAI_API_KEY'] = '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'
+os.environ['OPENAI_API_KEY'] = 'sk-xxxxxxxxxxxxx'
 os.environ['SERPER_API_KEY'] = '9f706fe3bb60606ca3a8d0cbf5b4986b31d4a84d'
 __import__('pysqlite3')
 import sys
@@ -270,7 +270,6 @@ def generate_llm_output(results, max_new_tokens=200, course_name=None, duration=
     )
 
     try:
-        # Execute crew tasks and return final result
         return crew.kickoff()
     
     except Exception as e:
