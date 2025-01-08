@@ -7,15 +7,21 @@ import numpy as np
 from transformers import pipeline
 from huggingface_hub import login
 import json
-os.environ['OPENAI_API_KEY'] = 'sk-xxxxxxxxxxxxx'
+os.environ['OPENAI_API_KEY'] = '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'
 os.environ['SERPER_API_KEY'] = '9f706fe3bb60606ca3a8d0cbf5b4986b31d4a84d'
 __import__('pysqlite3')
 import sys
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
-from crewai_tools import SerperDevTool
+from crewai_tools import FileWriterTool, SerperDevTool
+
 import openai
+from fpdf import FPDF
+from datetime import datetime
+from IPython.display import Markdown, display
+from rich.console import Console
+from rich.markdown import Markdown
 
 
 def set_hf_token(token):
@@ -132,9 +138,11 @@ def query_faiss_index(index, metadata, query, model_name='all-MiniLM-L6-v2', k=5
 def generate_llm_output(results, max_new_tokens=200, course_name=None, duration=None, max_length=None):
     """
     Generate output from OpenAI's GPT model using CrewAI for enhanced curriculum generation.
+    Includes file saving functionality.
     """
-    # Initialize tool
+    # Initialize tools
     tool = SerperDevTool()
+    file_writer_tool = FileWriterTool()
     
     # Prepare input text from vector DB results
     input_text = "\n\n".join([f"Subject: {res['subject']}\nCurriculum: {res['curriculum']}" for res in results])
@@ -165,7 +173,7 @@ def generate_llm_output(results, max_new_tokens=200, course_name=None, duration=
         {input_text}
     """
 
-    # Create specialized agents
+    # Create specialized agents (previous agent definitions remain the same)
     market_researcher = Agent(
         role='Market Research Specialist',
         goal='Research current industry trends and requirements',
@@ -199,10 +207,10 @@ def generate_llm_output(results, max_new_tokens=200, course_name=None, duration=
         backstory='Experienced in curriculum validation and quality control with expertise in clear formatting',
         verbose=False,
         allow_delegation=True,
-        tools=[tool]
+        tools=[tool, file_writer_tool]  # Add file_writer_tool to the quality reviewer
     )
 
-    # Define tasks with expected outputs
+    # Modified tasks with file saving
     research_task = Task(
         description=f"""
         Research current trends and requirements for {course_name}:
@@ -242,23 +250,27 @@ def generate_llm_output(results, max_new_tokens=200, course_name=None, duration=
         agent=content_enricher
     )
 
+    # Modified review task to include file saving
     review_task = Task(
         description=f"""
-        Review, validate, and format the final curriculum:
+        Review, validate, format the final curriculum, and save to file:
         1. Verify exact structure compliance ({num_terms} terms, {num_modules} modules, {num_topics} topics)
         2. Ensure clear formatting and organization
         3. Validate content quality and completeness
-        4. Format the final output in a clear, well-structured manner
+        4. Format the final output in Markdown
+        5. Save the curriculum to 'outputs/curriculum_{course_name.lower().replace(" ", "_")}.md'
 
         The final output must be perfectly formatted and ready for direct use.
 
         {base_prompt}
         """,
-        expected_output="A final, perfectly formatted curriculum that strictly follows the required structure and is ready for immediate use",
-        agent=quality_reviewer
+        expected_output="A final, perfectly formatted curriculum saved as a Markdown file",
+        agent=quality_reviewer,
+        output_file=f'outputs/curriculum_{course_name.lower().replace(" ", "_")}.md',
+        create_directory=True
     )
 
-    # Create and run the crew with updated parameters
+    # Create and run the crew
     crew = Crew(
         agents=[market_researcher, curriculum_designer, content_enricher, quality_reviewer],
         tasks=[research_task, design_task, enrich_task, review_task],
@@ -270,7 +282,10 @@ def generate_llm_output(results, max_new_tokens=200, course_name=None, duration=
     )
 
     try:
-        return crew.kickoff()
+        result = crew.kickoff()
+        
+        
+        return result
     
     except Exception as e:
         print(f"Error in curriculum generation: {e}")
@@ -371,12 +386,11 @@ def run_rag_pipeline(json_file, user_query , course_name = None, duration = None
 
 
 
-
 if __name__ == "__main__":
     # Set up Hugging Face authentication
     HF_TOKEN = "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"  
     set_hf_token(HF_TOKEN)
-    
+
     json_file = "curriculum_data.json"
 
     # Example user query
@@ -387,7 +401,3 @@ if __name__ == "__main__":
     # Run the pipeline
     output = run_rag_pipeline(json_file, user_query, course_name, duration)
     print(output)
-
-    # # Save output to a text file
-    # with open("output.txt", "w") as file:
-    #     file.write(output)
