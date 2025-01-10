@@ -15,6 +15,10 @@ sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
 from crewai_tools import FileWriterTool, SerperDevTool
+import streamlit as st
+from markdown import markdown
+from weasyprint import HTML
+import tempfile
 
 
 
@@ -321,18 +325,86 @@ def run_rag_pipeline(json_file, user_query , course_name = None, duration = None
 
 
 
-if __name__ == "__main__":
-    # Set up Hugging Face authentication
-    HF_TOKEN = "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"  
-    set_hf_token(HF_TOKEN)
+# Add a function to convert Markdown to PDF
+def md_to_pdf(markdown_file, pdf_file):
+    """
+    Convert a Markdown file to a PDF file.
+    :param markdown_file: Path to the input Markdown file.
+    :param pdf_file: Path to the output PDF file.
+    """
+    with open(markdown_file, 'r', encoding='utf-8') as f:
+        markdown_content = f.read()
 
-    json_file = "curriculum_data.json"
+    html_content = markdown(markdown_content)
 
-    # Example user query
-    course_name = input("Enter the course name: ")
-    duration = int(input("Enter the course duration: "))
-    user_query = f"{course_name} course for {duration} months"
+    html_complete = f"""
+    <html>
+        <head>
+            <meta charset="utf-8">
+        </head>
+        <body>
+            {html_content}
+        </body>
+    </html>
+    """
 
-    # Run the pipeline
-    output = run_rag_pipeline(json_file, user_query, course_name, duration)
-    print(output)
+    HTML(string=html_complete).write_pdf(pdf_file)
+
+# Modify the Streamlit App to include PDF functionality
+st.title("Curriculum Generator")
+st.sidebar.header("Please type the course name and duration to generate the curriculum for.")
+
+course_name = st.sidebar.text_input("Course Name")
+duration = st.sidebar.number_input("Duration (Months)", min_value=1, step=1)
+
+if st.button("Generate Curriculum"):
+    if course_name and duration:
+        with st.spinner("Processing..."):
+            json_file = "curriculum_data.json"
+            user_query = f"{course_name} course for {duration} months"
+            output = run_rag_pipeline(json_file, user_query, course_name, duration)
+
+            if output:
+                markdown_file = f'outputs/curriculum_{course_name.lower().replace(" ", "_")}.md'
+                pdf_file = f'outputs/curriculum_{course_name.lower().replace(" ", "_")}.pdf'
+
+                # Convert the generated Markdown file to PDF
+                md_to_pdf(markdown_file, pdf_file)
+
+                st.success("Curriculum Generated!")
+                st.text_area("Generated Curriculum", value=str(output), height=400)
+
+                # Provide a download link for the PDF
+                with open(pdf_file, "rb") as f:
+                    pdf_data = f.read()
+                st.download_button(
+                    label="Download Curriculum as PDF",
+                    data=pdf_data,
+                    file_name=f"{course_name}_curriculum.pdf",
+                    mime="application/pdf"
+                )
+            else:
+                st.error("Failed to generate curriculum.")
+    else:
+        st.warning("Please provide all required inputs.")
+
+
+# # Streamlit App
+# st.title("Curriculum Generator with CrewAI")
+# st.sidebar.header("Configuration")
+
+# course_name = st.sidebar.text_input("Course Name")
+# duration = st.sidebar.number_input("Duration (Months)", min_value=1, step=1)
+
+# if st.button("Generate Curriculum"):
+#     if course_name and duration:
+#         with st.spinner("Processing..."):
+#             json_file = "curriculum_data.json"
+#             user_query = f"{course_name} course for {duration} months"
+#             output = run_rag_pipeline(json_file, user_query, course_name, duration)
+#             st.success("Curriculum Generated!")
+#             st.text_area("Generated Curriculum", value=str(output), height=400)
+#     else:
+#         st.warning("Please provide all required inputs.")
+
+# conver to pdf 
