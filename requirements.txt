@@ -1,4 +1,11 @@
 PyPDF2
-faiss-cpu
+transformers
 sentence-transformers
-docling
+faiss-cpu
+numpy
+huggingface-hub
+pysqlite3
+crewai
+streamlit
+markdown
+weasyprint
