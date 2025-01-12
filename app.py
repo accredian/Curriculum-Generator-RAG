@@ -17,7 +17,7 @@ from crewai.project import CrewBase, agent, crew, task
 from crewai_tools import FileWriterTool, SerperDevTool
 import streamlit as st
 from markdown import markdown
-from weasyprint import HTML
+# from weasyprint import HTML
 import tempfile
 
 
