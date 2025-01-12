@@ -9,3 +9,4 @@ crewai
 streamlit
 markdown
 weasyprint
+crewai[tools]
