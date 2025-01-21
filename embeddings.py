@@ -331,6 +331,10 @@ if __name__ == "__main__":
     # Example user query
     course_name = input("Enter the course name: ")
     duration = int(input("Enter the course duration: "))
+    if duration:
+        
+    else
+        duration_in_hours = int(input("Enter the course duration in hours: "))  
     user_query = f"{course_name} course for {duration} months"
 
     # Run the pipeline

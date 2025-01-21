@@ -8,6 +8,8 @@ from transformers import pipeline
 from huggingface_hub import login
 import json
 os.environ['OPENAI_API_KEY'] = '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'
+# os.environ['OPENAI_API_KEY'] = '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'
+
 os.environ['SERPER_API_KEY'] = '9f706fe3bb60606ca3a8d0cbf5b4986b31d4a84d'
 __import__('pysqlite3')
 import sys
@@ -133,25 +135,23 @@ def query_faiss_index(index, metadata, query, model_name='all-MiniLM-L6-v2', k=5
 # -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------#
 # from g4f.client import Client
 
-def generate_llm_output(results, max_new_tokens=200, course_name=None, duration=None, max_length=None):
+def generate_llm_output(results, max_new_tokens=200, course_name=None, duration=None, duration_type="months", max_length=None):
     """
     Generate output from OpenAI's GPT model using CrewAI for enhanced curriculum generation.
-    Includes file saving functionality.
+    Modified to handle both duration types.
     """
-    # Initialize tools
     tool = SerperDevTool()
     file_writer_tool = FileWriterTool()
     
-    # Prepare input text from vector DB results
     input_text = "\n\n".join([f"Subject: {res['subject']}\nCurriculum: {res['curriculum']}" for res in results])
     
-    # Calculate curriculum structure
-    num_terms = duration
-    num_modules = duration * 4
-    num_topics = duration * 4 * 4
-    
-    # Base prompt with structure requirements
-    base_prompt = f"""
+    # Calculate curriculum structure based on duration type
+    if duration_type == "months":
+        num_terms = duration
+        num_modules = duration * 4
+        num_topics = duration * 4 * 4
+        
+        base_prompt = f"""
         You are tasked with designing a unique and detailed curriculum for the following course:
         
         **Course Name:** {course_name}  
@@ -169,7 +169,36 @@ def generate_llm_output(results, max_new_tokens=200, course_name=None, duration=
         
         Reference curriculum for inspiration:  
         {input_text}
-    """
+        """
+    else:  # hours
+        num_modules = duration // 3  # Every 3 hours = 1 module
+        num_terms = num_modules // 4  # Every 4 modules = 1 term
+        num_topics = num_modules * 4  # Each module has 4 topics
+        
+        base_prompt = f"""
+        You are tasked with designing a unique and detailed curriculum for the following course:
+        
+        **Course Name:** {course_name}  
+        **Duration:** {duration} hours  
+        
+        Logic for the curriculum structure:  
+        - Every 3 hours of content makes up 1 module.
+        - Every 4 modules (12 hours) constitutes 1 term.
+        - Each module contains 4 focused topics.
+        
+        Based on this structure:  
+        - This course will have {num_terms} terms.
+        - It will include {num_modules} modules (1 module per 3 hours).
+        - A total of {num_topics} topics will be covered.
+        
+        Additional considerations:
+        - Each 3-hour module should be self-contained and achievable within the time constraint.
+        - Topics should be carefully scoped to fit within their allocated module time.
+        - Ensure practical exercises and hands-on activities are appropriately timed.
+        
+        Reference curriculum for inspiration:  
+        {input_text}
+        """
 
     # Create specialized agents (previous agent definitions remain the same)
     market_researcher = Agent(
@@ -201,7 +230,7 @@ def generate_llm_output(results, max_new_tokens=200, course_name=None, duration=
 
     quality_reviewer = Agent(
         role='Quality Assurance Specialist',
-        goal='Ensure final curriculum is well-formatted, maintains exact structure, and meets quality standards',
+        goal='Ensure final curriculum is well-formatted, maintains exact structure, and meets quality standards ',
         backstory='Experienced in curriculum validation and quality control with expertise in clear formatting',
         verbose=False,
         allow_delegation=True,
@@ -254,7 +283,7 @@ def generate_llm_output(results, max_new_tokens=200, course_name=None, duration=
         Review, validate, format the final curriculum, and save to file:
         1. Verify exact structure compliance ({num_terms} terms, {num_modules} modules, {num_topics} topics)
         2. Ensure clear formatting and organization
-        3. Validate content quality and completeness
+        3. Validate content quality and completeness, make sure each term has 4 modules
         4. Format the final output in Markdown
         5. Save the curriculum to 'outputs/curriculum_{course_name.lower().replace(" ", "_")}.md'
 
@@ -298,28 +327,18 @@ def generate_llm_output(results, max_new_tokens=200, course_name=None, duration=
 
 
 
-def run_rag_pipeline(json_file, user_query , course_name = None, duration = None):
+def run_rag_pipeline(json_file, user_query, course_name=None, duration=None, duration_type="months"):
     """
     End-to-end RAG pipeline to process curriculum data and generate results.
-    :param json_file: Path to JSON file containing curriculum data.
-    :param user_query: Query provided by the user.
-    :return: Generated output from LLM.
+    Modified to handle duration type.
     """
-    # Step 1: Load data
     data = load_json(json_file)
-
-    # Step 2: Generate embeddings
     data = generate_embeddings(data)
-
-    # Step 3: Create and save FAISS index
     index, metadata = create_faiss_index(data)
     save_faiss_index(index, metadata)
+    results = query_faiss_index(index, metadata, user_query)
+    return generate_llm_output(results, course_name=course_name, duration=duration, duration_type=duration_type)
 
-    # Step 4: Query the database
-    results = query_faiss_index(index, metadata, user_query)  
-
-    # Step 5: Generate LLM output
-    return generate_llm_output(results , course_name = course_name, duration = duration)
 
 
 
@@ -350,31 +369,85 @@ def md_to_pdf(markdown_file, pdf_file):
 
     HTML(string=html_complete).write_pdf(pdf_file)
 
-# Modify the Streamlit App to include PDF functionality
+# # Modify the Streamlit App to include PDF functionality
+# st.title("Curriculum Generator")
+# st.sidebar.header("Please type the course name and duration to generate the curriculum for.")
+
+# course_name = st.sidebar.text_input("Course Name")
+# duration = st.sidebar.number_input("Duration (Months)", min_value=1, step=1)
+
+# if st.button("Generate Curriculum"):
+#     if course_name and duration:
+#         with st.spinner("Processing..."):
+#             json_file = "curriculum_data.json"
+#             user_query = f"{course_name} course for {duration} months"
+#             output = run_rag_pipeline(json_file, user_query, course_name, duration)
+
+#             if output:
+#                 markdown_file = f'outputs/curriculum_{course_name.lower().replace(" ", "_")}.md'
+#                 pdf_file = f'outputs/curriculum_{course_name.lower().replace(" ", "_")}.pdf'
+
+#                 # Convert the generated Markdown file to PDF
+#                 md_to_pdf(markdown_file, pdf_file)
+
+#                 st.success("Curriculum Generated!")
+#                 st.text_area("Generated Curriculum", value=str(output), height=400)
+
+#                 # Provide a download link for the PDF
+#                 with open(pdf_file, "rb") as f:
+#                     pdf_data = f.read()
+#                 st.download_button(
+#                     label="Download Curriculum as PDF",
+#                     data=pdf_data,
+#                     file_name=f"{course_name}_curriculum.pdf",
+#                     mime="application/pdf"
+#                 )
+#             else:
+#                 st.error("Failed to generate curriculum.")
+#     else:
+#         st.warning("Please provide all required inputs.")
+
+
+# Modified Streamlit interface
 st.title("Curriculum Generator")
-st.sidebar.header("Please type the course name and duration to generate the curriculum for.")
+st.sidebar.header("Please provide course details")
 
 course_name = st.sidebar.text_input("Course Name")
-duration = st.sidebar.number_input("Duration (Months)", min_value=1, step=1)
+
+# Add radio button for duration type selection
+duration_type = st.sidebar.radio("Select Duration Type", ["Months", "Hours"])
+
+# Conditional input based on duration type
+if duration_type == "Months":
+    duration = st.sidebar.number_input("Duration (Months)", min_value=1, step=1)
+else:
+    duration = st.sidebar.number_input("Duration (Hours) - ", min_value=3, step=3)  # Minimum 3 hours (1 module)
 
 if st.button("Generate Curriculum"):
     if course_name and duration:
         with st.spinner("Processing..."):
             json_file = "curriculum_data.json"
-            user_query = f"{course_name} course for {duration} months"
-            output = run_rag_pipeline(json_file, user_query, course_name, duration)
+            # Modify query based on duration type
+            user_query = f"{course_name} course for {duration} {duration_type.lower()}"
+            output = run_rag_pipeline(
+                json_file, 
+                user_query, 
+                course_name=course_name, 
+                duration=duration,
+                duration_type=duration_type.lower()
+            )
 
             if output:
                 markdown_file = f'outputs/curriculum_{course_name.lower().replace(" ", "_")}.md'
                 pdf_file = f'outputs/curriculum_{course_name.lower().replace(" ", "_")}.pdf'
 
-                # Convert the generated Markdown file to PDF
+                # Convert to PDF
                 md_to_pdf(markdown_file, pdf_file)
 
                 st.success("Curriculum Generated!")
                 st.text_area("Generated Curriculum", value=str(output), height=400)
 
-                # Provide a download link for the PDF
+                # Provide PDF download
                 with open(pdf_file, "rb") as f:
                     pdf_data = f.read()
                 st.download_button(
@@ -387,24 +460,3 @@ if st.button("Generate Curriculum"):
                 st.error("Failed to generate curriculum.")
     else:
         st.warning("Please provide all required inputs.")
-
-
-# # Streamlit App
-# st.title("Curriculum Generator with CrewAI")
-# st.sidebar.header("Configuration")
-
-# course_name = st.sidebar.text_input("Course Name")
-# duration = st.sidebar.number_input("Duration (Months)", min_value=1, step=1)
-
-# if st.button("Generate Curriculum"):
-#     if course_name and duration:
-#         with st.spinner("Processing..."):
-#             json_file = "curriculum_data.json"
-#             user_query = f"{course_name} course for {duration} months"
-#             output = run_rag_pipeline(json_file, user_query, course_name, duration)
-#             st.success("Curriculum Generated!")
-#             st.text_area("Generated Curriculum", value=str(output), height=400)
-#     else:
-#         st.warning("Please provide all required inputs.")
-
-# conver to pdf 
