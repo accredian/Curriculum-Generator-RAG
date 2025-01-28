@@ -8,9 +8,14 @@ from transformers import pipeline
 from huggingface_hub import login
 import json
 os.environ['OPENAI_API_KEY'] = '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'
-# os.environ['OPENAI_API_KEY'] = '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'
+# os.environ['OPENAI_API_KEY'] = 'sk-cGNL7dFWnZchBHtALgJhT3BlbkFJ8eDktSCI6gwbeSew8D'
 
 os.environ['SERPER_API_KEY'] = '9f706fe3bb60606ca3a8d0cbf5b4986b31d4a84d'
+# Must precede any llm module imports
+
+from langtrace_python_sdk import langtrace
+
+langtrace.init(api_key = '56acaaf0e99005bab5ad6088ab368d2cfa96cf9e507aee506e58abf9c352f1fa')
 __import__('pysqlite3')
 import sys
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
@@ -123,7 +128,7 @@ def query_faiss_index(index, metadata, query, model_name='all-MiniLM-L6-v2', k=5
     results = [metadata[idx] for idx in indices[0]]
     
     return results
-
+    
 #----------------------------------------------------------------------crew ai-----------------------------------------------------------------------------#
 
 
@@ -212,7 +217,7 @@ def generate_llm_output(results, max_new_tokens=200, course_name=None, duration=
 
     curriculum_designer = Agent(
         role='Curriculum Architect',
-        goal='Design curriculum following exact term-module-topic structure',
+        goal='Design curriculum following exact term-module-topic structure the curriculum that you design should ({num_terms} terms, {num_modules} modules, {num_topics} topics)',
         backstory='Senior curriculum designer specializing in structured learning paths',
         verbose=False,
         allow_delegation=True,
@@ -257,8 +262,11 @@ def generate_llm_output(results, max_new_tokens=200, course_name=None, duration=
         1. Follow the exact term-module-topic structure
         2. Define learning objectives
         3. Ensure progression logic
+        4. the curriculum that you design should ({num_terms} terms, {num_modules} modules, {num_topics} topics)
 
         {base_prompt}
+
+        
         """,
         expected_output="A structured curriculum outline following the specified term-module-topic format with clear learning objectives",
         agent=curriculum_designer
