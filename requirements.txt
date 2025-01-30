@@ -10,3 +10,4 @@ streamlit
 markdown
 weasyprint
 crewai[tools]
+langtrace-python-sdk
