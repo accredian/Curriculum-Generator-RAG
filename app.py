@@ -7,8 +7,8 @@ import numpy as np
 from transformers import pipeline
 from huggingface_hub import login
 import json
-os.environ['OPENAI_API_KEY'] = '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'
-# os.environ['OPENAI_API_KEY'] = 'sk-cGNL7dFWnZchBHtALgJhT3BlbkFJ8eDktSCI6gwbeSew8D'
+# os.environ['OPENAI_API_KEY'] = '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'
+os.environ['OPENAI_API_KEY'] = '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'
 
 os.environ['SERPER_API_KEY'] = '9f706fe3bb60606ca3a8d0cbf5b4986b31d4a84d'
 # Must precede any llm module imports
@@ -224,110 +224,66 @@ def generate_llm_output(results, max_new_tokens=200, course_name=None, duration=
         {input_text}
         """
 
-    # Create specialized agents (previous agent definitions remain the same)
-    market_researcher = Agent(
-        role='Market Research Specialist',
-        goal='Research current industry trends and requirements',
-        backstory='Expert in industry analysis with deep understanding of market demands',
+
+    # Merged Agent 1: Research + Curriculum Design
+    curriculum_developer = Agent(
+        role='Curriculum Developer',
+        goal='Research trends and design the structured curriculum',
+        backstory='A senior expert in curriculum development with a strong understanding of market demands and structured learning design.',
         verbose=False,
         allow_delegation=True,
         tools=[tool]
     )
 
-    curriculum_designer = Agent(
-        role='Curriculum Architect',
-        goal='Design curriculum following exact term-module-topic structure the curriculum that you design should ({num_terms} terms, {num_modules} modules, {num_topics} topics)',
-        backstory='Senior curriculum designer specializing in structured learning paths',
+    # Merged Agent 2: Content Enhancement + Quality Review
+    content_specialist = Agent(
+        role='Quality Specialist',
+        goal='Enhance,  ensure quality & formatting , make sure that you Structure the curriculum with exact with  ({num_terms} terms, {num_modules} modules, {num_topics} topics)',
+        backstory='An experienced content designer skilled in making learning engaging while maintaining structure and clarity.',
         verbose=False,
         allow_delegation=True,
-        tools=[tool]
+        tools=[tool, file_writer_tool]
     )
 
-    content_enricher = Agent(
-        role='Content Enhancement Specialist',
-        goal='Add practical examples while maintaining structure',
-        backstory='Expert in combining theory with real-world applications',
-        verbose=False,
-        allow_delegation=True,
-        tools=[tool]
-    )
-
-    quality_reviewer = Agent(
-        role='Quality Assurance Specialist',
-        goal='Ensure final curriculum is well-formatted, maintains exact structure, and meets quality standards ',
-        backstory='Experienced in curriculum validation and quality control with expertise in clear formatting',
-        verbose=False,
-        allow_delegation=True,
-        tools=[tool, file_writer_tool]  # Add file_writer_tool to the quality reviewer
-    )
-
-    # Modified tasks with file saving
-    research_task = Task(
+    # Task 1: Research + Curriculum Design
+    curriculum_task = Task(
         description=f"""
-        Research current trends and requirements for {course_name}:
-        1. Identify industry trends and demands
+        Research and design a curriculum for {course_name}:
+        1. Identify industry trends and skills needed
         2. Research tools and technologies
-        3. Find relevant case studies
+        3. Structure curriculum with exact ({num_terms} terms, {num_modules} modules, {num_topics} topics)
+        4. Define learning objectives and progression logic
 
         {base_prompt}
         """,
-        expected_output="A comprehensive report of current industry trends, required skills, and market demands for the course topic",
-        agent=market_researcher
+        expected_output="A structured curriculum following the specified term-module-topic format with clear learning objectives.",
+        agent=curriculum_developer
     )
 
-    design_task = Task(
+    # Task 2: Content Enhancement + Quality Review + Save to File
+    final_review_task = Task(
         description=f"""
-        Design the curriculum structure using research findings:
-        1. Follow the exact term-module-topic structure
-        2. Define learning objectives
-        3. Ensure progression logic
-        4. the curriculum that you design should ({num_terms} terms, {num_modules} modules, {num_topics} topics)
+        Enhance and finalize the curriculum:
+        1. Add industry-relevant case studies at the end 
+        2. Ensure curriculum structure remains intact
+        3. Verify correct formatting and content clarity
+        4. Format in Markdown and save to 'outputs/curriculum_{course_name.lower().replace(" ", "_")}.md'
+        5. make sure that you Structure the curriculum with exact with  ({num_terms} terms, {num_modules} modules, {num_topics} topics)
 
-        {base_prompt}
-
-        
-        """,
-        expected_output="A structured curriculum outline following the specified term-module-topic format with clear learning objectives",
-        agent=curriculum_designer
-    )
-
-    enrich_task = Task(
-        description=f"""
-        Enhance the curriculum with practical elements:
-        1. Add real-world examples
-        2. Include industry tools
-        3. Maintain the required structure
+        The final output must be polished and ready for direct use.
 
         {base_prompt}
         """,
-        expected_output="An enhanced curriculum with practical examples, tools, and real-world applications while maintaining the required structure",
-        agent=content_enricher
-    )
-
-    # Modified review task to include file saving
-    review_task = Task(
-        description=f"""
-        Review, validate, format the final curriculum, and save to file:
-        1. Verify exact structure compliance ({num_terms} terms, {num_modules} modules, {num_topics} topics)
-        2. Ensure clear formatting and organization
-        3. Validate content quality and completeness, make sure each term has 4 modules
-        4. Format the final output in Markdown
-        5. Save the curriculum to 'outputs/curriculum_{course_name.lower().replace(" ", "_")}.md'
-
-        The final output must be perfectly formatted and ready for direct use.
-
-        {base_prompt}
-        """,
-        expected_output="A final, perfectly formatted curriculum saved as a Markdown file",
-        agent=quality_reviewer,
+        expected_output="A final, formatted curriculum with practical examples saved as a Markdown file.",
+        agent=content_specialist,
         output_file=f'outputs/curriculum_{course_name.lower().replace(" ", "_")}.md',
         create_directory=True
     )
 
-    # Create and run the crew
+    # Create and run the optimized crew
     crew = Crew(
-        agents=[market_researcher, curriculum_designer, content_enricher, quality_reviewer],
-        tasks=[research_task, design_task, enrich_task, review_task],
+        agents=[curriculum_developer, content_specialist],
+        tasks=[curriculum_task, final_review_task],
         memory=True,
         cache=True,
         max_rpm=100,
@@ -440,62 +396,6 @@ def md_to_pdf(markdown_file, pdf_file):
 
     HTML(string=html_complete).write_pdf(pdf_file)
 
-
-
-
-
-# Modified Streamlit interface
-# st.title("Curriculum Generator")
-# st.sidebar.header("Please provide course details")
-
-# course_name = st.sidebar.text_input("Course Name")
-
-# # Add radio button for duration type selection
-# duration_type = st.sidebar.radio("Select Duration Type", ["Months", "Hours"])
-
-# # Conditional input based on duration type
-# if duration_type == "Months":
-#     duration = st.sidebar.number_input("Duration (Months)", min_value=1, step=1)
-# else:
-#     duration = st.sidebar.number_input("Duration (Hours) - ", min_value=3, step=3)  # Minimum 3 hours (1 module)
-
-# if st.button("Generate Curriculum"):
-#     if course_name and duration:
-#         with st.spinner("Processing..."):
-#             json_file = "curriculum_data.json"
-#             # Modify query based on duration type
-#             user_query = f"{course_name} course for {duration} {duration_type.lower()}"
-#             output = run_rag_pipeline(
-#                 json_file, 
-#                 user_query, 
-#                 course_name=course_name, 
-#                 duration=duration,
-#                 duration_type=duration_type.lower()
-#             )
-
-#             if output:
-#                 markdown_file = f'outputs/curriculum_{course_name.lower().replace(" ", "_")}.md'
-#                 pdf_file = f'outputs/curriculum_{course_name.lower().replace(" ", "_")}.pdf'
-
-#                 # Convert to PDF
-#                 md_to_pdf(markdown_file, pdf_file)
-
-#                 st.success("Curriculum Generated!")
-#                 st.text_area("Generated Curriculum", value=str(output), height=400)
-
-#                 # Provide PDF download
-#                 with open(pdf_file, "rb") as f:
-#                     pdf_data = f.read()
-#                 st.download_button(
-#                     label="Download Curriculum as PDF",
-#                     data=pdf_data,
-#                     file_name=f"{course_name}_curriculum.pdf",
-#                     mime="application/pdf"
-#                 )
-#             else:
-#                 st.error("Failed to generate curriculum.")
-#     else:
-#         st.warning("Please provide all required inputs.")
 
 
 # st.title("Curriculum Generator")
