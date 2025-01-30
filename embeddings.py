@@ -16,8 +16,24 @@ from crewai import Agent, Crew, Process, Task
 from crewai.project import CrewBase, agent, crew, task
 from crewai_tools import FileWriterTool, SerperDevTool
 
+import time
+from typing import Dict, Any, Tuple
+from functools import wraps
 
+def timing_decorator(func):
+    """Decorator to measure execution time of functions"""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        end_time = time.time()
+        execution_time = end_time - start_time
+        wrapper.timing = execution_time  # Store timing in the function object
+        print(f"{func.__name__} took {execution_time:.2f} seconds to execute")
+        return result
+    return wrapper
 
+@timing_decorator
 def set_hf_token(token):
     """
     Set up Hugging Face authentication
@@ -28,7 +44,7 @@ def set_hf_token(token):
 
 
 
-
+@timing_decorator
 def load_json(file_path):
     """
     Load JSON data from a file.
@@ -39,6 +55,7 @@ def load_json(file_path):
         return json.load(file)
 
 # ---------------------------------------------------------------------------embeddings------------------------------------------------------------------------------#
+@timing_decorator
 def generate_embeddings(data, model_name='all-MiniLM-L6-v2'):
     """
     Generate embeddings for curriculum data.
@@ -53,7 +70,7 @@ def generate_embeddings(data, model_name='all-MiniLM-L6-v2'):
     return data
 # ---------------------------------------------------------------------------Save and Load FAISS Index------------------------------------------------------------------------------#
 
-
+@timing_decorator
 def create_faiss_index(data):
     """
     Create a FAISS index from curriculum embeddings.
@@ -70,7 +87,7 @@ def create_faiss_index(data):
     return index, metadata
 
 
-
+@timing_decorator
 def save_faiss_index(index, metadata, index_path="index.faiss", metadata_path="metadata.json"):
     """
     Save FAISS index and metadata to some place.
@@ -84,7 +101,7 @@ def save_faiss_index(index, metadata, index_path="index.faiss", metadata_path="m
         json.dump(metadata, file)
 
 
-
+@timing_decorator
 def load_faiss_index(index_path="index.faiss", metadata_path="metadata.json"):
     """
     Load FAISS index and metadata from that place.
@@ -99,7 +116,7 @@ def load_faiss_index(index_path="index.faiss", metadata_path="metadata.json"):
 
 
 #-----------------------------------------------------------------------4. Query the Database-------------------------------------------------------------#
-
+@timing_decorator
 def query_faiss_index(index, metadata, query, model_name='all-MiniLM-L6-v2', k=5):
     """
     Query the FAISS index with user input.
@@ -128,7 +145,7 @@ def query_faiss_index(index, metadata, query, model_name='all-MiniLM-L6-v2', k=5
 
 # -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------#
 # from g4f.client import Client
-
+@timing_decorator
 def generate_llm_output(results, max_new_tokens=200, course_name=None, duration=None, max_length=None):
     """
     Generate output from OpenAI's GPT model using CrewAI for enhanced curriculum generation.
@@ -293,29 +310,69 @@ def generate_llm_output(results, max_new_tokens=200, course_name=None, duration=
 #-----------------------------------------------------------------------Full pipeline-------------------------------------------------------------#
 
 
+# def run_rag_pipeline(json_file, user_query , course_name = None, duration = None):
+#     """
+#     End-to-end RAG pipeline to process curriculum data and generate results.
+#     :param json_file: Path to JSON file containing curriculum data.
+#     :param user_query: Query provided by the user.
+#     :return: Generated output from LLM.
+#     """
+#     # Step 1: Load data
+#     data = load_json(json_file)
 
-def run_rag_pipeline(json_file, user_query , course_name = None, duration = None):
+#     # Step 2: Generate embeddings
+#     data = generate_embeddings(data)
+
+#     # Step 3: Create and save FAISS index
+#     index, metadata = create_faiss_index(data)
+#     save_faiss_index(index, metadata)
+
+#     # Step 4: Query the database
+#     results = query_faiss_index(index, metadata, user_query)  
+
+#     # Step 5: Generate LLM output
+#     return generate_llm_output(results , course_name = course_name, duration = duration)
+@timing_decorator
+def run_rag_pipeline(json_file, user_query, course_name=None, duration=None) -> Tuple[Any, Dict[str, float]]:
     """
-    End-to-end RAG pipeline to process curriculum data and generate results.
-    :param json_file: Path to JSON file containing curriculum data.
-    :param user_query: Query provided by the user.
-    :return: Generated output from LLM.
+    End-to-end RAG pipeline with timing measurements.
+    Returns a tuple of (output, timing_results)
     """
     # Step 1: Load data
     data = load_json(json_file)
-
+    
     # Step 2: Generate embeddings
     data = generate_embeddings(data)
-
+    
     # Step 3: Create and save FAISS index
     index, metadata = create_faiss_index(data)
     save_faiss_index(index, metadata)
-
+    
     # Step 4: Query the database
-    results = query_faiss_index(index, metadata, user_query)  
-
+    results = query_faiss_index(index, metadata, user_query)
+    
     # Step 5: Generate LLM output
-    return generate_llm_output(results , course_name = course_name, duration = duration)
+    output = generate_llm_output(results, course_name=course_name, duration=duration)
+    
+    # Collect all timing results
+    timing_results = {
+        'load_json': load_json.timing,
+        'generate_embeddings': generate_embeddings.timing,
+        'create_faiss_index': create_faiss_index.timing,
+        'save_faiss_index': save_faiss_index.timing,
+        'query_faiss_index': query_faiss_index.timing,
+        'generate_llm_output': generate_llm_output.timing,
+        'total_time': sum([
+            load_json.timing,
+            generate_embeddings.timing,
+            create_faiss_index.timing,
+            save_faiss_index.timing,
+            query_faiss_index.timing,
+            generate_llm_output.timing
+        ])
+    }
+    
+    return output, timing_results
 
 
 
@@ -323,20 +380,21 @@ def run_rag_pipeline(json_file, user_query , course_name = None, duration = None
 
 if __name__ == "__main__":
     # Set up Hugging Face authentication
-    HF_TOKEN = "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"  
+    HF_TOKEN = "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"
     set_hf_token(HF_TOKEN)
-
+    
     json_file = "curriculum_data.json"
-
+    
     # Example user query
     course_name = input("Enter the course name: ")
     duration = int(input("Enter the course duration: "))
-    if duration:
-        
-    else
-        duration_in_hours = int(input("Enter the course duration in hours: "))  
     user_query = f"{course_name} course for {duration} months"
-
-    # Run the pipeline
-    output = run_rag_pipeline(json_file, user_query, course_name, duration)
-    print(output)
+    
+    # Run the pipeline and get timing results
+    output, timing_results = run_rag_pipeline(json_file, user_query, course_name, duration)
+    
+    # Print detailed timing results
+    print("\nTiming Results:")
+    print("-" * 50)
+    for step, time_taken in timing_results.items():
+        print(f"{step}: {time_taken:.2f} seconds")

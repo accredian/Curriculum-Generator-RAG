@@ -26,9 +26,27 @@ import streamlit as st
 from markdown import markdown
 from weasyprint import HTML
 import tempfile
+import time
+from typing import Dict, Any, Tuple
+from functools import wraps
+import pandas as pd
 
 
+def timing_decorator(func):
+    """Decorator to measure execution time of functions"""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        end_time = time.time()
+        execution_time = end_time - start_time
+        wrapper.timing = execution_time  # Store timing in the function object
+        print(f"{func.__name__} took {execution_time:.2f} seconds to execute")
+        return result
+    return wrapper
 
+
+@timing_decorator
 def set_hf_token(token):
     """
     Set up Hugging Face authentication
@@ -39,7 +57,7 @@ def set_hf_token(token):
 
 
 
-
+@timing_decorator
 def load_json(file_path):
     """
     Load JSON data from a file.
@@ -50,6 +68,7 @@ def load_json(file_path):
         return json.load(file)
 
 # ---------------------------------------------------------------------------embeddings------------------------------------------------------------------------------#
+@timing_decorator
 def generate_embeddings(data, model_name='all-MiniLM-L6-v2'):
     """
     Generate embeddings for curriculum data.
@@ -64,7 +83,7 @@ def generate_embeddings(data, model_name='all-MiniLM-L6-v2'):
     return data
 # ---------------------------------------------------------------------------Save and Load FAISS Index------------------------------------------------------------------------------#
 
-
+@timing_decorator
 def create_faiss_index(data):
     """
     Create a FAISS index from curriculum embeddings.
@@ -81,7 +100,7 @@ def create_faiss_index(data):
     return index, metadata
 
 
-
+@timing_decorator
 def save_faiss_index(index, metadata, index_path="index.faiss", metadata_path="metadata.json"):
     """
     Save FAISS index and metadata to some place.
@@ -95,7 +114,7 @@ def save_faiss_index(index, metadata, index_path="index.faiss", metadata_path="m
         json.dump(metadata, file)
 
 
-
+@timing_decorator
 def load_faiss_index(index_path="index.faiss", metadata_path="metadata.json"):
     """
     Load FAISS index and metadata from that place.
@@ -110,7 +129,7 @@ def load_faiss_index(index_path="index.faiss", metadata_path="metadata.json"):
 
 
 #-----------------------------------------------------------------------4. Query the Database-------------------------------------------------------------#
-
+@timing_decorator
 def query_faiss_index(index, metadata, query, model_name='all-MiniLM-L6-v2', k=5):
     """
     Query the FAISS index with user input.
@@ -139,7 +158,7 @@ def query_faiss_index(index, metadata, query, model_name='all-MiniLM-L6-v2', k=5
 
 # -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------#
 # from g4f.client import Client
-
+@timing_decorator
 def generate_llm_output(results, max_new_tokens=200, course_name=None, duration=None, duration_type="months", max_length=None):
     """
     Generate output from OpenAI's GPT model using CrewAI for enhanced curriculum generation.
@@ -334,18 +353,61 @@ def generate_llm_output(results, max_new_tokens=200, course_name=None, duration=
 #-----------------------------------------------------------------------Full pipeline-------------------------------------------------------------#
 
 
+# @timing_decorator
+# def run_rag_pipeline(json_file, user_query, course_name=None, duration=None, duration_type="months"):
+#     """
+#     End-to-end RAG pipeline to process curriculum data and generate results.
+#     Modified to handle duration type.
+#     """
+#     data = load_json(json_file)
+#     data = generate_embeddings(data)
+#     index, metadata = create_faiss_index(data)
+#     save_faiss_index(index, metadata)
+#     results = query_faiss_index(index, metadata, user_query)
+#     return generate_llm_output(results, course_name=course_name, duration=duration, duration_type=duration_type)
 
-def run_rag_pipeline(json_file, user_query, course_name=None, duration=None, duration_type="months"):
+
+@timing_decorator
+def run_rag_pipeline(json_file, user_query, course_name=None, duration=None , duration_type = "months") -> Tuple[Any, Dict[str, float]]:
     """
-    End-to-end RAG pipeline to process curriculum data and generate results.
-    Modified to handle duration type.
+    End-to-end RAG pipeline with timing measurements.
+    Returns a tuple of (output, timing_results)
     """
+    # Step 1: Load data
     data = load_json(json_file)
+    
+    # Step 2: Generate embeddings
     data = generate_embeddings(data)
+    
+    # Step 3: Create and save FAISS index
     index, metadata = create_faiss_index(data)
     save_faiss_index(index, metadata)
+    
+    # Step 4: Query the database
     results = query_faiss_index(index, metadata, user_query)
-    return generate_llm_output(results, course_name=course_name, duration=duration, duration_type=duration_type)
+    
+    # Step 5: Generate LLM output
+    output = generate_llm_output(results, course_name=course_name, duration=duration, duration_type=duration_type)
+    
+    # Collect all timing results
+    timing_results = {
+        'load_json': load_json.timing,
+        'generate_embeddings': generate_embeddings.timing,
+        'create_faiss_index': create_faiss_index.timing,
+        'save_faiss_index': save_faiss_index.timing,
+        'query_faiss_index': query_faiss_index.timing,
+        'generate_llm_output': generate_llm_output.timing,
+        'total_time': sum([
+            load_json.timing,
+            generate_embeddings.timing,
+            create_faiss_index.timing,
+            save_faiss_index.timing,
+            query_faiss_index.timing,
+            generate_llm_output.timing
+        ])
+    }
+    
+    return output, timing_results
 
 
 
@@ -353,6 +415,7 @@ def run_rag_pipeline(json_file, user_query, course_name=None, duration=None, dur
 
 
 # Add a function to convert Markdown to PDF
+@timing_decorator
 def md_to_pdf(markdown_file, pdf_file):
     """
     Convert a Markdown file to a PDF file.
@@ -377,31 +440,50 @@ def md_to_pdf(markdown_file, pdf_file):
 
     HTML(string=html_complete).write_pdf(pdf_file)
 
-# # Modify the Streamlit App to include PDF functionality
+
+
+
+
+# Modified Streamlit interface
 # st.title("Curriculum Generator")
-# st.sidebar.header("Please type the course name and duration to generate the curriculum for.")
+# st.sidebar.header("Please provide course details")
 
 # course_name = st.sidebar.text_input("Course Name")
-# duration = st.sidebar.number_input("Duration (Months)", min_value=1, step=1)
+
+# # Add radio button for duration type selection
+# duration_type = st.sidebar.radio("Select Duration Type", ["Months", "Hours"])
+
+# # Conditional input based on duration type
+# if duration_type == "Months":
+#     duration = st.sidebar.number_input("Duration (Months)", min_value=1, step=1)
+# else:
+#     duration = st.sidebar.number_input("Duration (Hours) - ", min_value=3, step=3)  # Minimum 3 hours (1 module)
 
 # if st.button("Generate Curriculum"):
 #     if course_name and duration:
 #         with st.spinner("Processing..."):
 #             json_file = "curriculum_data.json"
-#             user_query = f"{course_name} course for {duration} months"
-#             output = run_rag_pipeline(json_file, user_query, course_name, duration)
+#             # Modify query based on duration type
+#             user_query = f"{course_name} course for {duration} {duration_type.lower()}"
+#             output = run_rag_pipeline(
+#                 json_file, 
+#                 user_query, 
+#                 course_name=course_name, 
+#                 duration=duration,
+#                 duration_type=duration_type.lower()
+#             )
 
 #             if output:
 #                 markdown_file = f'outputs/curriculum_{course_name.lower().replace(" ", "_")}.md'
 #                 pdf_file = f'outputs/curriculum_{course_name.lower().replace(" ", "_")}.pdf'
 
-#                 # Convert the generated Markdown file to PDF
+#                 # Convert to PDF
 #                 md_to_pdf(markdown_file, pdf_file)
 
 #                 st.success("Curriculum Generated!")
 #                 st.text_area("Generated Curriculum", value=str(output), height=400)
 
-#                 # Provide a download link for the PDF
+#                 # Provide PDF download
 #                 with open(pdf_file, "rb") as f:
 #                     pdf_data = f.read()
 #                 st.download_button(
@@ -416,7 +498,66 @@ def md_to_pdf(markdown_file, pdf_file):
 #         st.warning("Please provide all required inputs.")
 
 
-# Modified Streamlit interface
+# st.title("Curriculum Generator")
+# st.sidebar.header("Please provide course details")
+
+# course_name = st.sidebar.text_input("Course Name")
+
+# # Add radio button for duration type selection
+# duration_type = st.sidebar.radio("Select Duration Type", ["Months", "Hours"])
+
+# # Conditional input based on duration type
+# if duration_type == "Months":
+#     duration = st.sidebar.number_input("Duration (Months)", min_value=1, step=1)
+# else:
+#     duration = st.sidebar.number_input("Duration (Hours)", min_value=3, step=3)  # Minimum 3 hours (1 module)
+
+# if st.button("Generate Curriculum"):
+#     if course_name and duration:
+#         with st.spinner("Processing..."):
+#             json_file = "curriculum_data.json"
+#             # Modify query based on duration type
+#             user_query = f"{course_name} course for {duration} {duration_type.lower()}"
+#             output = run_rag_pipeline(
+#                 json_file, 
+#                 user_query, 
+#                 course_name=course_name, 
+#                 duration=duration,
+#                 duration_type=duration_type.lower()
+#             )
+
+#             if output:
+#                 markdown_file = f'outputs/curriculum_{course_name.lower().replace(" ", "_")}.md'
+#                 pdf_file = f'outputs/curriculum_{course_name.lower().replace(" ", "_")}.pdf'
+
+#                 # Save markdown content to file
+#                 with open(markdown_file, 'w', encoding='utf-8') as f:
+#                     f.write(str(output))
+
+#                 # Convert to PDF
+#                 md_to_pdf(markdown_file, pdf_file)
+
+#                 st.success("Curriculum Generated!")
+                
+#                 # Display rendered markdown
+#                 st.markdown("### Generated Curriculum (Markdown)")
+#                 st.markdown(str(output))
+
+#                 # Provide PDF download
+#                 with open(pdf_file, "rb") as f:
+#                     pdf_data = f.read()
+#                 st.download_button(
+#                     label="Download Curriculum as PDF",
+#                     data=pdf_data,
+#                     file_name=f"{course_name}_curriculum.pdf",
+#                     mime="application/pdf"
+#                 )
+#             else:
+#                 st.error("Failed to generate curriculum.")
+#     else:
+#         st.warning("Please provide all required inputs.")
+
+
 st.title("Curriculum Generator")
 st.sidebar.header("Please provide course details")
 
@@ -429,7 +570,7 @@ duration_type = st.sidebar.radio("Select Duration Type", ["Months", "Hours"])
 if duration_type == "Months":
     duration = st.sidebar.number_input("Duration (Months)", min_value=1, step=1)
 else:
-    duration = st.sidebar.number_input("Duration (Hours) - ", min_value=3, step=3)  # Minimum 3 hours (1 module)
+    duration = st.sidebar.number_input("Duration (Hours)", min_value=3, step=3)  # Minimum 3 hours (1 module)
 
 if st.button("Generate Curriculum"):
     if course_name and duration:
@@ -437,7 +578,9 @@ if st.button("Generate Curriculum"):
             json_file = "curriculum_data.json"
             # Modify query based on duration type
             user_query = f"{course_name} course for {duration} {duration_type.lower()}"
-            output = run_rag_pipeline(
+            
+            # Capture both output and timing results
+            output, timing_results = run_rag_pipeline(
                 json_file, 
                 user_query, 
                 course_name=course_name, 
@@ -449,11 +592,31 @@ if st.button("Generate Curriculum"):
                 markdown_file = f'outputs/curriculum_{course_name.lower().replace(" ", "_")}.md'
                 pdf_file = f'outputs/curriculum_{course_name.lower().replace(" ", "_")}.pdf'
 
+                # Save markdown content to file
+                with open(markdown_file, 'w', encoding='utf-8') as f:
+                    f.write(str(output))
+
                 # Convert to PDF
                 md_to_pdf(markdown_file, pdf_file)
 
                 st.success("Curriculum Generated!")
-                st.text_area("Generated Curriculum", value=str(output), height=400)
+                
+                # Display timing results in an expander
+                with st.expander("View Processing Times"):
+                    st.write("### Processing Times")
+                    # Create a DataFrame for better visualization
+                    timing_df = pd.DataFrame({
+                        'Step': timing_results.keys(),
+                        'Time (seconds)': [f"{time:.2f}" for time in timing_results.values()]
+                    })
+                    st.dataframe(timing_df)
+                    
+                    # Optional: Add a bar chart
+                    st.bar_chart(timing_df.set_index('Step')['Time (seconds)'].astype(float))
+                
+                # Display rendered markdown
+                st.markdown("### Generated Curriculum (Markdown)")
+                st.markdown(str(output))
 
                 # Provide PDF download
                 with open(pdf_file, "rb") as f:
