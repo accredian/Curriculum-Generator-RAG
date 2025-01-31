@@ -8,9 +8,9 @@ from transformers import pipeline
 from huggingface_hub import login
 import json
 # os.environ['OPENAI_API_KEY'] = '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'
-os.environ['OPENAI_API_KEY'] = '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'
+# # os.environ['OPENAI_API_KEY'] = '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'
 
-os.environ['SERPER_API_KEY'] = '9f706fe3bb60606ca3a8d0cbf5b4986b31d4a84d'
+# os.environ['SERPER_API_KEY'] = '9f706fe3bb60606ca3a8d0cbf5b4986b31d4a84d'
 # Must precede any llm module imports
 
 from langtrace_python_sdk import langtrace
@@ -26,6 +26,7 @@ import streamlit as st
 from markdown import markdown
 from weasyprint import HTML
 import tempfile
+
 import time
 from typing import Dict, Any, Tuple
 from functools import wraps
@@ -312,16 +313,16 @@ def generate_llm_output(results, max_new_tokens=200, course_name=None, duration=
         1. Verify exact structure compliance ({num_terms} terms, {num_modules} modules, {num_topics} topics)
         2. Ensure clear formatting and organization
         3. Validate content quality and completeness, make sure each term has 4 modules
-        4. Format the final output in Markdown
-        5. Save the curriculum to 'outputs/curriculum_{course_name.lower().replace(" ", "_")}.md'
+        4. Format the final output in well structured format
+        5. Save the curriculum to 'outputs/curriculum_{course_name.lower().replace(" ", "_")}.txt'
 
         The final output must be perfectly formatted and ready for direct use.
 
         {base_prompt}
         """,
-        expected_output="A final, perfectly formatted curriculum saved as a Markdown file",
+        expected_output="A final, perfectly formatted curriculum saved as a txt file",
         agent=quality_reviewer,
-        output_file=f'outputs/curriculum_{course_name.lower().replace(" ", "_")}.md',
+        output_file=f'outputs/curriculum_{course_name.lower().replace(" ", "_")}.txt',
         create_directory=True
     )
 
@@ -352,22 +353,6 @@ def generate_llm_output(results, max_new_tokens=200, course_name=None, duration=
 
 
 #-----------------------------------------------------------------------Full pipeline-------------------------------------------------------------#
-
-
-# @timing_decorator
-# def run_rag_pipeline(json_file, user_query, course_name=None, duration=None, duration_type="months"):
-#     """
-#     End-to-end RAG pipeline to process curriculum data and generate results.
-#     Modified to handle duration type.
-#     """
-#     data = load_json(json_file)
-#     data = generate_embeddings(data)
-#     index, metadata = create_faiss_index(data)
-#     save_faiss_index(index, metadata)
-#     results = query_faiss_index(index, metadata, user_query)
-#     return generate_llm_output(results, course_name=course_name, duration=duration, duration_type=duration_type)
-
-
 @timing_decorator
 def run_rag_pipeline(json_file, user_query, course_name=None, duration=None , duration_type = "months") -> Tuple[Any, Dict[str, float]]:
     """
@@ -417,29 +402,90 @@ def run_rag_pipeline(json_file, user_query, course_name=None, duration=None , du
 
 # Add a function to convert Markdown to PDF
 @timing_decorator
-def md_to_pdf(markdown_file, pdf_file):
+def txt_to_pdf(text_file, pdf_file):
     """
-    Convert a Markdown file to a PDF file.
-    :param markdown_file: Path to the input Markdown file.
-    :param pdf_file: Path to the output PDF file.
+    Convert a plain text/markdown file to a properly formatted PDF file.
+    
+    :param text_file: Path to the input text file
+    :param pdf_file: Path to the output PDF file
     """
-    with open(markdown_file, 'r', encoding='utf-8') as f:
-        markdown_content = f.read()
-
-    html_content = markdown(markdown_content)
-
+    # Read the text file
+    with open(text_file, 'r', encoding='utf-8') as f:
+        text_content = f.read()
+    
+    # Convert Markdown to HTML with extra features enabled
+    html_content = markdown(
+        text_content,
+        extensions=[
+            'markdown.extensions.tables',
+            'markdown.extensions.fenced_code',
+            'markdown.extensions.codehilite',
+            'markdown.extensions.nl2br'
+        ]
+    )
+    
+    # Enhanced HTML template with better styling
     html_complete = f"""
     <html>
         <head>
             <meta charset="utf-8">
+            <style>
+                body {{
+                    font-family: Arial, sans-serif;
+                    font-size: 14px;
+                    line-height: 1.6;
+                    margin: 40px;
+                    color: #333;
+                }}
+                h1 {{ font-size: 28px; margin-bottom: 20px; }}
+                h2 {{ font-size: 24px; margin-bottom: 15px; }}
+                h3 {{ font-size: 20px; margin-bottom: 10px; }}
+                p {{ margin-bottom: 15px; }}
+                code {{
+                    background-color: #f5f5f5;
+                    padding: 2px 5px;
+                    border-radius: 3px;
+                    font-family: monospace;
+                }}
+                pre {{
+                    background-color: #f5f5f5;
+                    padding: 15px;
+                    border-radius: 5px;
+                    overflow-x: auto;
+                }}
+                blockquote {{
+                    border-left: 4px solid #ddd;
+                    padding-left: 15px;
+                    margin-left: 0;
+                    color: #666;
+                }}
+                table {{
+                    border-collapse: collapse;
+                    width: 100%;
+                    margin-bottom: 15px;
+                }}
+                th, td {{
+                    border: 1px solid #ddd;
+                    padding: 8px;
+                    text-align: left;
+                }}
+                th {{
+                    background-color: #f5f5f5;
+                }}
+            </style>
         </head>
         <body>
             {html_content}
         </body>
     </html>
     """
+    
+    # Convert to PDF with better options
+    HTML(string=html_complete).write_pdf(
+        pdf_file,
+        presentational_hints=True
+    )
 
-    HTML(string=html_complete).write_pdf(pdf_file)
 
 
 
@@ -463,7 +509,9 @@ def md_to_pdf(markdown_file, pdf_file):
 #             json_file = "curriculum_data.json"
 #             # Modify query based on duration type
 #             user_query = f"{course_name} course for {duration} {duration_type.lower()}"
-#             output = run_rag_pipeline(
+
+#             # Capture both output and timing results
+#             output, timing_results = run_rag_pipeline(
 #                 json_file, 
 #                 user_query, 
 #                 course_name=course_name, 
@@ -472,21 +520,38 @@ def md_to_pdf(markdown_file, pdf_file):
 #             )
 
 #             if output:
-#                 markdown_file = f'outputs/curriculum_{course_name.lower().replace(" ", "_")}.md'
-#                 pdf_file = f'outputs/curriculum_{course_name.lower().replace(" ", "_")}.pdf'
+#                 text_file = f'outputs/curriculum{course_name.lower().replace(" ", "")}.txt'
+#                 pdf_file = f'outputs/curriculum{course_name.lower().replace(" ", "")}.pdf'
 
-#                 # Save markdown content to file
-#                 with open(markdown_file, 'w', encoding='utf-8') as f:
-#                     f.write(str(output))
+#                 cleaned_output = str(output).strip().replace("```", "").strip()
+
+#                 # Save text content to file
+#                 with open(text_file, 'w', encoding='utf-8') as f:
+#                     f.write(str(cleaned_output))
 
 #                 # Convert to PDF
-#                 md_to_pdf(markdown_file, pdf_file)
+#                 txt_to_pdf(text_file, pdf_file)
 
 #                 st.success("Curriculum Generated!")
-                
-#                 # Display rendered markdown
-#                 st.markdown("### Generated Curriculum (Markdown)")
-#                 st.markdown(str(output))
+
+#                 # Display timing results in an expander
+#                 with st.expander("View Processing Times"):
+#                     st.write("### Processing Times")
+#                     # Create a DataFrame for better visualization
+#                     timing_df = pd.DataFrame({
+#                         'Step': timing_results.keys(),
+#                         'Time (seconds)': [f"{time:.2f}" for time in timing_results.values()]
+#                     })
+#                     st.dataframe(timing_df)
+
+#                     # Optional: Add a bar chart
+#                     st.bar_chart(timing_df.set_index('Step')['Time (seconds)'].astype(float))
+
+#                 # Display the plain text content from the text file
+#                 with open(text_file, "r", encoding="utf-8") as f:
+#                     text_content = f.read()
+
+#                 st.markdown(text_content)  # Display plain text properly in Streamlit
 
 #                 # Provide PDF download
 #                 with open(pdf_file, "rb") as f:
@@ -502,8 +567,67 @@ def md_to_pdf(markdown_file, pdf_file):
 #     else:
 #         st.warning("Please provide all required inputs.")
 
+# import streamlit as st
+# import os
+# import pandas as pd
 
+# Add title and about section
 st.title("Curriculum Generator")
+
+# About section in an expander
+with st.expander("About", expanded=True):
+    st.markdown("""
+    ### Welcome to the Curriculum Generator!
+    
+    This tool helps you generate comprehensive course curricula using AI technology. Simply provide your course details and API keys to get started.
+    
+    #### How to Use:
+    1. Enter your API keys in the sidebar (required only once per session)
+    2. Input your course name
+    3. Select duration type (Months or Hours)
+    4. Specify the duration
+    5. Click 'Generate Curriculum' to create your customized course outline
+    
+    #### Features:
+    - Generates detailed course structure
+    - Provides downloadable PDF output
+    - Shows processing times and performance metrics
+    - Supports both time-based and hour-based course planning
+    
+    #### Note:
+    Make sure you have valid API keys for:
+    - OpenAI API
+    - Serper API
+    """)
+
+# API Keys section in sidebar
+st.sidebar.header("API Configuration")
+
+# Store API keys in session state if not already present
+if 'openai_api_key' not in st.session_state:
+    st.session_state.openai_api_key = None
+if 'serper_api_key' not in st.session_state:
+    st.session_state.serper_api_key = None
+
+with st.sidebar.expander("Enter API Keys", expanded=True):
+    openai_key = st.text_input("OpenAI API Key", type="password")
+    serper_key = st.text_input("Serper API Key", type="password")
+    
+    if st.button("Save API Keys"):
+        if openai_key and serper_key:
+            # Store in session state
+            st.session_state.openai_api_key = openai_key
+            st.session_state.serper_api_key = serper_key
+            
+            # Set in OS environment variables
+            os.environ['OPENAI_API_KEY'] = openai_key
+            os.environ['SERPER_API_KEY'] = serper_key
+            
+            st.success("API keys saved successfully!")
+        else:
+            st.error("Please provide both API keys.")
+
+# Course Details Section
 st.sidebar.header("Please provide course details")
 
 course_name = st.sidebar.text_input("Course Name")
@@ -517,14 +641,15 @@ if duration_type == "Months":
 else:
     duration = st.sidebar.number_input("Duration (Hours)", min_value=3, step=3)  # Minimum 3 hours (1 module)
 
+# Generate Curriculum button
 if st.button("Generate Curriculum"):
-    if course_name and duration:
+    if not st.session_state.openai_api_key or not st.session_state.serper_api_key:
+        st.warning("Please set up your API keys first.")
+    elif course_name and duration:
         with st.spinner("Processing..."):
             json_file = "curriculum_data.json"
-            # Modify query based on duration type
             user_query = f"{course_name} course for {duration} {duration_type.lower()}"
-            
-            # Capture both output and timing results
+
             output, timing_results = run_rag_pipeline(
                 json_file, 
                 user_query, 
@@ -534,34 +659,36 @@ if st.button("Generate Curriculum"):
             )
 
             if output:
-                markdown_file = f'outputs/curriculum_{course_name.lower().replace(" ", "_")}.md'
+                text_file = f'outputs/curriculum_{course_name.lower().replace(" ", "_")}.txt'
                 pdf_file = f'outputs/curriculum_{course_name.lower().replace(" ", "_")}.pdf'
 
-                # Save markdown content to file
-                with open(markdown_file, 'w', encoding='utf-8') as f:
-                    f.write(str(output))
+
+                cleaned_output = str(output).strip().replace("```", "").strip()
+
+
+                # Save text content to file
+                with open(text_file, 'w', encoding='utf-8') as f:
+                    f.write(str(cleaned_output))
 
                 # Convert to PDF
-                md_to_pdf(markdown_file, pdf_file)
+                txt_to_pdf(text_file, pdf_file)
 
                 st.success("Curriculum Generated!")
                 
                 # Display timing results in an expander
                 with st.expander("View Processing Times"):
                     st.write("### Processing Times")
-                    # Create a DataFrame for better visualization
                     timing_df = pd.DataFrame({
                         'Step': timing_results.keys(),
                         'Time (seconds)': [f"{time:.2f}" for time in timing_results.values()]
                     })
                     st.dataframe(timing_df)
-                    
-                    # Optional: Add a bar chart
                     st.bar_chart(timing_df.set_index('Step')['Time (seconds)'].astype(float))
-                
-                # Display rendered markdown
-                st.markdown("### Generated Curriculum (Markdown)")
-                st.markdown(str(output))
+
+                # Display the plain text content
+                with open(text_file, "r", encoding='utf-8') as f:
+                    text_content = f.read()
+                st.markdown(text_content)
 
                 # Provide PDF download
                 with open(pdf_file, "rb") as f:
