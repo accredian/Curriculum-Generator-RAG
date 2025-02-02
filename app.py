@@ -575,29 +575,35 @@ def txt_to_pdf(text_file, pdf_file):
 st.title("Curriculum Generator")
 
 # About section in an expander
-with st.expander("About", expanded=True):
+# with st.expander("About", expanded=True):
+#     st.markdown("""
+#     ### Welcome to the Curriculum Generator!
+    
+#     This tool helps you generate comprehensive course curricula using AI technology. Simply provide your course details and API keys to get started.
+    
+#     #### How to Use:
+#     1. Enter your API keys in the sidebar (required only once per session)
+#     2. Input your course name
+#     3. Select duration type (Months or Hours)
+#     4. Specify the duration
+#     5. Click 'Generate Curriculum' to create your customized course outline
+    
+#     #### Features:
+#     - Generates detailed course structure
+#     - Provides downloadable PDF output
+#     - Shows processing times and performance metrics
+#     - Supports both time-based and hour-based course planning
+    
+#     #### Note:
+#     Make sure you have valid API keys for:
+#     - OpenAI API
+#     - Serper API
+#     """)
+
+with st.sidebar.expander("About", expanded=True):
     st.markdown("""
     ### Welcome to the Curriculum Generator!
-    
-    This tool helps you generate comprehensive course curricula using AI technology. Simply provide your course details and API keys to get started.
-    
-    #### How to Use:
-    1. Enter your API keys in the sidebar (required only once per session)
-    2. Input your course name
-    3. Select duration type (Months or Hours)
-    4. Specify the duration
-    5. Click 'Generate Curriculum' to create your customized course outline
-    
-    #### Features:
-    - Generates detailed course structure
-    - Provides downloadable PDF output
-    - Shows processing times and performance metrics
-    - Supports both time-based and hour-based course planning
-    
-    #### Note:
-    Make sure you have valid API keys for:
-    - OpenAI API
-    - Serper API
+This tool helps you generate comprehensive course curricula using AI technology. Simply provide your course details and API keys to get started.
     """)
 
 # API Keys section in sidebar
