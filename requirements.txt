@@ -1,0 +1,13 @@
+PyPDF2
+transformers
+sentence-transformers
+faiss-cpu
+numpy
+huggingface-hub
+pysqlite3-binary
+crewai
+streamlit
+markdown
+weasyprint
+crewai[tools]
+langtrace-python-sdk
